@@ -1,0 +1,148 @@
+#include <ESP8266WiFi.h>
+#include <Servo.h>
+Servo servo;
+#include "DHT.h" // including the library of DHT11 temperature and humidity sensor
+#define DHTTYPE DHT11 // DHT 11
+#define dht_dpin D5
+DHT dht(dht_dpin, DHTTYPE);  
+const char* ssid = "familiabonilla";
+const char* password = "Lina2014Queen2015Radio2016";
+int ven=D6; 
+int Pin1 = D0; // GPIO13
+int ldr = A0;
+int buzzer = D7;  
+int valor = 0;  
+WiFiServer server(80);
+ 
+void setup() {
+  // pongo como salida el buzzer
+  pinMode(buzzer, OUTPUT);
+  Serial.begin(115200);
+  delay(10);
+  //pongo el motor
+  servo.attach(D1); //gpio-2
+  delay(10);
+  // luces 
+  pinMode(Pin1, OUTPUT);
+  pinMode(ven,OUTPUT);
+  digitalWrite(Pin1, LOW);
+  digitalWrite(ven,LOW);
+  //
+  // sensor
+  dht.begin(); 
+  Serial.println("Humidity and temperature\n\n");
+  delay(700); 
+ 
+
+  
+ 
+  // Connect to WiFi network
+  Serial.println();
+  Serial.println();
+  Serial.print(" conectando ");
+  Serial.println(ssid);
+ 
+  WiFi.begin(ssid, password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi conectado");
+ 
+  // Start the server
+  server.begin();
+  Serial.println("Server started");
+ 
+  // Print the IP address
+  Serial.print("conectarse a : ");
+  Serial.print("http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("/");
+ 
+}
+ 
+void loop() {
+  // Check if a client has connected
+  WiFiClient client = server.available();
+  if (!client) {
+    return;
+  }
+ 
+  // Wait until the client sends some data
+  Serial.println("nuevo cliente");
+  while(!client.available()){
+    delay(1);
+  }
+  // sensor 
+   float h = dht.readHumidity();
+   float t = dht.readTemperature();
+   Serial.print("Current humidity = ");
+   Serial.print(h);
+   Serial.print("% ");
+   Serial.print("temperature = ");
+   Serial.print(t);
+   Serial.println("C ");
+   delay(800); 
+
+  if (t>=26){
+    digitalWrite(ven,HIGH);
+  }
+
+
+
+  //
+  valor = analogRead(ldr);  // leo la fotocelda 
+  if (valor<=800){
+    digitalWrite(buzzer,HIGH);
+  }
+  //acciones 
+  String respuesta = client.readStringUntil('\r');
+  Serial.println(respuesta);
+  client.flush();
+  if (respuesta.indexOf("LED=1") != -1){
+    Serial.println(" encender luces");
+    digitalWrite(Pin1,HIGH);
+  }
+  if (respuesta.indexOf("LED=2") != -1){
+    Serial.println(" apagar luces");
+    digitalWrite(Pin1,LOW);
+  }
+  if (respuesta.indexOf("LED=5")!= -1){
+    digitalWrite(buzzer,LOW);
+  }
+
+
+  // Return the response
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println(""); 
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+ 
+  client.print("<h2 align=center> LUCES ");
+  client.println("<br><br>");
+  client.println("<a href=\"/LED=1\"\"><button> Encender  </button></a>");
+  client.println("<a href=\"/LED=2\"\"><button>  Apagar </button></a><br />");  
+  client.println("<br><br>");
+  client.println("</html>");
+  client.print("<h2 align=center> PUERTA ");
+  client.println("<br><br>");
+  client.println("</html>");
+  client.print("<h2 align=center> Apagar Alarma ");
+  client.println("<br><br>");
+  client.println("<a href=\"/LED=5\"\"><button> Apagar </button></a>");
+  client.println("<br><br>");
+  client.print("<h2 align=center> Temperatura del cuarto  :");
+  client.println(t);
+  client.println("<br><br>");
+  client.print("<h2 align=center> humedad del cuarto  :");
+  client.println(h);
+  client.println("</html>");
+
+  delay(1);
+  Serial.println("desconectado");
+  Serial.println("");
+ 
+}
